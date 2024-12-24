@@ -208,6 +208,25 @@ class Explosion(pg.sprite.Sprite):
             self.kill()
 
 
+    def update(self):
+        """
+        敵機を速度ベクトルself.vyに基づき移動（降下）させる
+        ランダムに決めた停止位置_boundまで降下したら，_stateを停止状態に変更する
+        """
+        if self.rect.centery > self.bound:
+            self.vy = 0
+            self.state = "stop"
+        self.rect.move_ip(self.vx, self.vy)
+
+    def hit(self):
+        """
+        ビームに当たった際の処理
+        耐久力を1減らし、耐久力が0になったら敵を削除
+        戻り値：敵を削除するかどうか（True/False）
+        """
+        self.durability -= 1
+        return self.durability <= 0
+
 class Enemy(pg.sprite.Sprite):
     """
     敵機に関するクラス
@@ -223,6 +242,12 @@ class Enemy(pg.sprite.Sprite):
         self.bound = random.randint(50, HEIGHT//2)  # 停止位置
         self.state = "down"  # 降下状態or停止状態
         self.interval = random.randint(50, 300)  # 爆弾投下インターバル
+        self.shield = True
+
+        self.shield_surface = pg.Surface(self.image.get_size(), pg.SRCALPHA)
+        pg.draw.rect(self.shield_surface, (0, 255, 255, 128),  # 水色の半透明
+                    self.shield_surface.get_rect(), 3)
+
 
     def update(self):
         """
@@ -234,7 +259,23 @@ class Enemy(pg.sprite.Sprite):
             self.vy = 0
             self.state = "stop"
         self.rect.move_ip(self.vx, self.vy)
-
+        # if self.shield_active:
+        #    current_image = self.image.copy()
+        #    current_image.blit(self.shield_surface, (0, 0))
+        #    self.image = current_image
+    
+    def hit(self) -> bool:
+        """
+        ビームに当たった際の処理
+        シールドがある場合はシールドを破壊し、
+        シールドがない場合は敵機を破壊する
+        戻り値：敵機を破壊するかどうか（True/False）
+        """
+        if self.shield_active:
+            self.shield_active = False
+            self.image = random.choice(__class__.imgs)  # シールドを外した元の画像に戻す
+            return False
+        return True
 
 class NeoBeam:
     def __init__(self, bird: Bird, num: int):
@@ -405,7 +446,7 @@ def main():
             if event.type == pg.KEYDOWN:
                 if event.key == pg.K_SPACE:
                     beams.add(Beam(bird))
-                if key_lst[pg.K_LALT] and event.key == pg.K_SPACE:
+                if key_lst[pg.K_ｂ] and event.key == pg.K_SPACE:
                     neo_beam = NeoBeam(bird, 5)
                     beams.add(*neo_beam.gen_beams())
             if score.value >= 20 and key_lst[pg.K_e] and not emp.active:
@@ -453,6 +494,13 @@ def main():
         
         for bomb in pg.sprite.groupcollide(bombs, gra, True, False).keys():  # 重力と衝突した爆弾リスト
             exps.add(Explosion(bomb, 50))  # 爆弾の爆発エフェクト
+        # 敵との衝突処理を修正
+        for emy in list(pg.sprite.groupcollide(emys, beams, False, True).keys()):  # 敵は削除しない
+            if emy.hit():  # 敵の耐久力を減らし、0になったら削除
+                emys.remove(emy)
+                exps.add(Explosion(emy, 100))  # 爆発エフェクト
+                score.value += 10  # 10点アップ
+                bird.change_img(6, screen)  # こうかとん喜びエフェクト
 
 
         bird.update(key_lst, screen)
@@ -471,6 +519,7 @@ def main():
         pg.display.update()
         tmr += 1
         clock.tick(50)
+
 
 
 if __name__ == "__main__":
