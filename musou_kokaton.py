@@ -259,7 +259,7 @@ class Enemy(pg.sprite.Sprite):
             self.vy = 0
             self.state = "stop"
         self.rect.move_ip(self.vx, self.vy)
-        #if self.shield_active:
+        # if self.shield_active:
         #    current_image = self.image.copy()
         #    current_image.blit(self.shield_surface, (0, 0))
         #    self.image = current_image
